@@ -243,24 +243,22 @@ export default function Chat() {
         setImageFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
     };
 
-    const handleLogin = async (event: React.KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === "Enter" && !event.shiftKey) {
-            event.preventDefault();
+    const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+  
+        const response = await fetch("/api/auth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ secret: password }),
+        });
 
-            const response = await fetch("/api/auth", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ secret: password }),
-            });
-            setPassword("");
-            if (response.ok) {
-                setShowLogin(false);
-                return;
-            } else { 
-                const message = await response.text();
-                alert(message);
-                return;
-            }
+        setPassword("");
+
+        if (response.ok) {
+            setShowLogin(false);
+        } else {
+            const message = await response.text();
+            alert(message);
         }
     };
 
@@ -311,9 +309,14 @@ export default function Chat() {
             {showLogin && (
                 <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center">
                     <div className="w-3/4 max-w-md">
-                        <input type="password" className="w-full px-4 py-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none" 
-                        onChange={(e)=>{setPassword(e.target.value)}} 
-                        onKeyDown={handleLogin}/>
+                        <form onSubmit={handleLogin}>
+                            <input type="password" className="w-full px-4 py-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none" 
+                            value={password}
+                            onChange={(e)=>{setPassword(e.target.value)}} 
+                            required/>
+                            <button type="submit" className="hidden"></button>
+                        </form>
+                        
                     </div>
                 </div>
             )}
@@ -373,6 +376,12 @@ export default function Chat() {
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center pointer-events-none">
                 <div className="bg-zinc-900 p-6 rounded-lg w-3/4 max-w-md pointer-events-auto">
                     <h2 className="text-lg font-semibold text-white mb-4">Chat History</h2>
+                    <button
+                        className="absolute top-2 right-3 text-white text-lg"
+                        onClick={() => setShowHistory(false)}
+                    >
+                        ✖
+                    </button>
                     <div className="max-h-60 overflow-y-auto">
                     {chatHistory.map((chat) => (
                         <div key={chat.id} className="flex justify-between bg-zinc-800 p-2 rounded mb-2">

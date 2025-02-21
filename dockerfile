@@ -19,7 +19,6 @@ WORKDIR /app/minima-ui
 COPY --from=builder /app/minima-ui/package.json ./
 COPY --from=builder /app/minima-ui/node_modules ./node_modules
 COPY --from=builder /app/minima-ui/.next ./.next
-COPY --from=builder /app/minima-ui/public ./public
 COPY --from=builder /app/minima-ui/src ./src
 
 EXPOSE 3000
