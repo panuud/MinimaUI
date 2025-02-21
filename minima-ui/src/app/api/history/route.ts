@@ -6,22 +6,29 @@ const historyFile = path.join(process.cwd(), "chatHistory.json");
 
 export async function POST(req: NextRequest) {
   try {
+    // Extract user's cookie as their unique key
+    const userKey = req.cookies.get("eieiaroijang")?.value;
+    if (!userKey) return new Response("Unauthorized", { status: 401 });
+
     const { messages, conversationId } = await req.json();
 
-    let history: any[] = [];
+    let history: Record<string, any> = {};
     try {
       const data = await fs.readFile(historyFile, "utf-8");
       history = JSON.parse(data);
-    } catch (error) {
+    } catch {
       console.log("No existing history file, creating a new one.");
     }
 
+    // Ensure user-specific storage exists
+    if (!history[userKey]) history[userKey] = [];
+
     // Find the conversation by ID and update it, otherwise add a new one
-    const existingIndex = history.findIndex((conv) => conv.id === conversationId);
+    const existingIndex = history[userKey].findIndex((conv: any) => conv.id === conversationId);
     if (existingIndex !== -1) {
-      history[existingIndex].messages = messages;
+      history[userKey][existingIndex].messages = messages;
     } else {
-      history.push({ id: conversationId, timestamp: new Date().toISOString(), messages });
+      history[userKey].push({ id: conversationId, timestamp: new Date().toISOString(), messages });
     }
 
     await fs.writeFile(historyFile, JSON.stringify(history, null, 2));
@@ -33,11 +40,15 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const userKey = req.cookies.get("eieiaroijang")?.value;
+    if (!userKey) return new Response("Unauthorized", { status: 401 });
+
     const data = await fs.readFile(historyFile, "utf-8");
     const history = JSON.parse(data);
-    return NextResponse.json(history);
+
+    return NextResponse.json(history[userKey] || []);
   } catch (error) {
     console.log("No history available.");
     return new Response("No history available.", { status: 404 });
@@ -46,26 +57,30 @@ export async function GET() {
 
 export async function DELETE(req: NextRequest) {
     try {
+      const userKey = req.cookies.get("eieiaroijang")?.value;
+      if (!userKey) return new Response("Unauthorized", { status: 401 });
+
       const { conversationId, messageIndex } = await req.json();
   
-      let history: any[] = [];
+      let history: Record<string, any> = [];
       try {
         const data = await fs.readFile(historyFile, "utf-8");
         history = JSON.parse(data);
       } catch (error) {
         console.log("No history found.");
       }
-  
+      if (!history[userKey]) return new Response("No history available", { status: 404 });
+
       // Find conversation
-      const convIndex = history.findIndex((conversation) => conversation.id === conversationId);
+      const convIndex = history[userKey].findIndex((conversation: any) => conversation.id === conversationId);
       if (convIndex === -1) return new Response("Conversation not found.", { status: 404 });
   
       // Remove specific message
       if (messageIndex !== undefined) {
-        history[convIndex].messages.splice(messageIndex, 1);
+        history[userKey][convIndex].messages.splice(messageIndex, 1);
       } else {
         // Filter out the conversation to delete
-        history = history.filter((conversation) => conversation.id !== conversationId);
+        history[userKey] = history[userKey].filter((conversation: any) => conversation.id !== conversationId);
       }
   
       await fs.writeFile(historyFile, JSON.stringify(history, null, 2));

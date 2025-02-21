@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     failedAttempts.set(clientIp, 0);
 
     // Create JWT
-    const token = await new SignJWT({ auth: true })
+    const token = await new SignJWT({ auth: true, ip: clientIp })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(JWT_SECRET));

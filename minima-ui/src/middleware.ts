@@ -20,7 +20,15 @@ export async function middleware(req: NextRequest) {
   }
 
   try {
-    await jwtVerify(token, secret);
+    // Extract user IP
+    const forwardedFor = req.headers.get("x-forwarded-for");
+    const currentIp = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown";
+
+    // Verify JWT
+    const { payload } = await jwtVerify(token, secret);
+    if (payload.auth !== true || payload.ip !== currentIp) {
+      return NextResponse.json({ error: "Invalid session" }, { status: 403 });
+    }
     return NextResponse.next();
   } catch (error) {
     return new NextResponse(JSON.stringify({ error: "Unauthorized" }), {
