@@ -1,9 +1,12 @@
 
 # MinimaUI
 
-A minimalistic **Next.js** web application that allows users to interact with an AI through a simple text field. The app supports conversation history, session management via cookies, and the ability to send images to the AI.
+**🤫 Want to chat with AI without anyone noticing? Try MinimaUI!**  
+It looks just like plain text—no fancy UI, no distractions, just you and the AI.  
 
-https://github.com/user-attachments/assets/1fcbf060-81f2-4380-83a4-bb448ec5313a
+**MinimaUI** is a **minimalistic Next.js web app** that lets you interact with an AI through a simple text field. It keeps your conversation history, manages sessions with cookies, and even allows you to send images to the AI—all in an ultra-lightweight, no-frills interface. 
+
+![無題の動画](https://github.com/user-attachments/assets/938f7399-0f6f-47ff-8f6b-793c196343a1)
 
 ## Features
 
