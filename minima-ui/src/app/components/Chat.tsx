@@ -76,8 +76,8 @@ export default function Chat() {
         
         // ensure messages length is less than context window
         const LIMIT_CONTEXT_WINDOW = parseInt(process.env.NEXT_PUBLIC_LIMIT_CONTEXT_WINDOW || "50000", 10);
-        let shiftedMessages: Message[] = []; 
-        let contextMessages: Message[] = [...messages];
+        const shiftedMessages: Message[] = []; 
+        const contextMessages: Message[] = [...messages];
         while (true) {
             if (JSON.stringify(contextMessages).length > LIMIT_CONTEXT_WINDOW) {
                 shiftedMessages.push(contextMessages.shift()!); // Store removed messages in fullHistory
