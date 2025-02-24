@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import Image from 'next/image'
 
 interface Message {
-    role: "user" | "assistant";
+    role: "user" | "assistant" | "system";
     content: string | Array<{ type: string; image_url: { url: string } }>;
 }
 
@@ -61,7 +62,38 @@ export default function Chat() {
             setInput("");
             return;
         }
-        
+
+        // Image generation
+        if (input.trim().startsWith("/genimage")) {
+            const regex = /^\/genimage\s+(\d{3,4}x\d{3,4})\s+"(.+)"$/;
+
+            const match = input.trim().match(regex);
+            if (!match) {
+                alert("Command format: /genimage <width>x<height> \"prompt\"");
+                return;
+            };
+          
+            const [, size, prompt] = match;
+            setInput("");
+            setLoading(true);
+            try {
+                const response = await fetch("/api/generate-image", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ size: size, prompt: prompt }),
+                });
+
+                if (!response.ok) throw new Error("Failed to generate image");
+
+                const { url } = await response.json();
+                setMessages([...messages, { role: "system", content: url }]);
+            } catch {
+                setMessages([...messages, { role: "system", content: "Failed to generate image" }]);
+            }
+            setLoading(false);
+            return;
+        }
+
         const imageMessages: Message[] = imageFiles.map(image => ({
             role: "user",
             content: [
@@ -333,7 +365,10 @@ export default function Chat() {
             <div className="flex-1 overflow-y-auto space-y-2 max-w-full">
                 {messages.map((msg, idx) => (
                     <div key={idx} className="flex group relative">
-                        <pre className="text-left text-gray-200 break-words whitespace-pre-wrap max-w-full">{'>>> ' + msg.content}</pre>
+                        {typeof msg.content === "string" && msg.content.startsWith("http") ?
+                            (<Image src={msg.content} width={500} height={500} alt="generated" className="max-w-full rounded-lg" />) :
+                            (<pre className="text-left text-gray-200 break-words whitespace-pre-wrap max-w-full">{'>>> ' + msg.content}</pre>)
+                        }
                         <button
                             className="hidden group-hover:inline text-red-400 text-xs absolute bottom-0 right-0"
                             onClick={() => deleteMessage(idx)}
