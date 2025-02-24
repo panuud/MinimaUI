@@ -255,6 +255,7 @@ export default function Chat() {
             body: JSON.stringify({ secret: password, username: username }),
         });
 
+        setUsername("");
         setPassword("");
 
         if (response.ok) {
@@ -310,7 +311,7 @@ export default function Chat() {
         <div className="fixed inset-0 bg-zinc-950 flex flex-col max-w-2xl mx-auto">
             {/* login tab */}
             {showLogin && (
-                <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center">
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
                     <div className="w-3/4 max-w-md">
                         <form onSubmit={handleLogin}>
                             <input type="password" className="w-full px-4 py-2 my-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none" 
