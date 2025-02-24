@@ -76,16 +76,17 @@ export default function Chat() {
         
         // ensure messages length is less than context window
         const LIMIT_CONTEXT_WINDOW = parseInt(process.env.NEXT_PUBLIC_LIMIT_CONTEXT_WINDOW || "50000", 10);
+        let shiftedMessages: Message[] = []; 
+        let contextMessages: Message[] = [...messages];
         while (true) {
-            if (JSON.stringify(messages).length > LIMIT_CONTEXT_WINDOW) {
-                messages.shift();
+            if (JSON.stringify(contextMessages).length > LIMIT_CONTEXT_WINDOW) {
+                shiftedMessages.push(contextMessages.shift()!); // Store removed messages in fullHistory
             } else {
                 break;
             }
         }
 
-        const newMessages: Message[] = [...messages, ...imageMessages, { role: "user", content: input }];
-        setMessages(newMessages);
+        const newMessages: Message[] = [...contextMessages, ...imageMessages, { role: "user", content: input }];
         setLoading(true);
         setInput("");
 
@@ -102,9 +103,10 @@ export default function Chat() {
             const decoder = new TextDecoder();
 
             // Read the streaming response from the server
-            const filteredMessages: Message[] = imageFiles.length > 0? 
+            let filteredMessages: Message[] = imageFiles.length > 0? 
                 newMessages.filter((msg) => !(msg.content instanceof Array)):
                 newMessages;
+            filteredMessages = [...shiftedMessages, ...filteredMessages];
             let assistantMessage = "";
             const updatedMessages: Message[] = [...filteredMessages, { role: "assistant", content: "" }];
             setMessages(updatedMessages);
