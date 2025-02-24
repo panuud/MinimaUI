@@ -31,7 +31,8 @@ export default function Chat() {
     const [imageFiles, setImageFiles] = useState<ImagesFile[]>([]);
     const [showLogin, setShowLogin] = useState(false);
     const [password, setPassword] = useState("");
-  
+    const [username, setUsername] = useState("");
+
     const sendMessage = async () => {
         if (!input.trim()) return;
         
@@ -249,7 +250,7 @@ export default function Chat() {
         const response = await fetch("/api/auth", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ secret: password }),
+            body: JSON.stringify({ secret: password, username: username }),
         });
 
         setPassword("");
@@ -310,7 +311,11 @@ export default function Chat() {
                 <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center">
                     <div className="w-3/4 max-w-md">
                         <form onSubmit={handleLogin}>
-                            <input type="password" className="w-full px-4 py-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none" 
+                            <input type="password" className="w-full px-4 py-2 my-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none" 
+                            value={username}
+                            onChange={(e)=>{setUsername(e.target.value)}} 
+                            required/>
+                            <input type="password" className="w-full px-4 py-2 my-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none" 
                             value={password}
                             onChange={(e)=>{setPassword(e.target.value)}} 
                             required/>

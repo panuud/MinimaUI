@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     const forwardedFor = req.headers.get("x-forwarded-for");
     const clientIp = forwardedFor ? forwardedFor.split(",")[0].trim() : "unknown"; 
     console.log("Client IP login request: " + clientIp + ` (${failedAttempts.get(clientIp)})`);
-    const { secret } = await req.json();
+    const { secret, username } = await req.json();
 
     // Initialize failed attempts
     if (!failedAttempts.has(clientIp)) {
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     failedAttempts.set(clientIp, 0);
 
     // Create JWT
-    const token = await new SignJWT({ auth: true, ip: clientIp })
+    const token = await new SignJWT({ auth: true, ip: clientIp, username: username })
     .setProtectedHeader({ alg: "HS256" })
     .setExpirationTime("1h")
     .sign(new TextEncoder().encode(JWT_SECRET));

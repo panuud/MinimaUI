@@ -1,14 +1,31 @@
 ﻿import { NextResponse, NextRequest } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { jwtVerify } from "jose";
 
 const historyFile = path.join(process.cwd(), "chatHistory.json");
+const JWT_SECRET = process.env.JWT_SECRET!;
+const secret = new TextEncoder().encode(JWT_SECRET);
+
+interface JwtPayload {
+  auth: boolean;
+  ip: string;
+  username: string;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    // Extract user's cookie as their unique key
-    const userKey = req.cookies.get("eieiaroijang")?.value;
-    if (!userKey) return new Response("Unauthorized", { status: 401 });
+    // Extract user's username and ip from their JWT and use it as a key 
+    const token = req.cookies.get("eieiaroijang")?.value;
+    let userKey: string;
+
+    if (!token) return new Response("Unauthorized", { status: 401 });
+    try{
+      const { payload } = await jwtVerify(token, secret) as { payload: JwtPayload };
+      userKey = payload.username + payload.ip;
+    } catch {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
     const { messages, conversationId } = await req.json();
 
@@ -42,8 +59,16 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const userKey = req.cookies.get("eieiaroijang")?.value;
-    if (!userKey) return new Response("Unauthorized", { status: 401 });
+    const token = req.cookies.get("eieiaroijang")?.value;
+    let userKey: string;
+
+    if (!token) return new Response("Unauthorized", { status: 401 });
+    try{
+      const { payload } = await jwtVerify(token, secret) as { payload: JwtPayload };
+      userKey = payload.username + payload.ip;
+    } catch {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
     const data = await fs.readFile(historyFile, "utf-8");
     const history = JSON.parse(data);
@@ -57,8 +82,16 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
     try {
-      const userKey = req.cookies.get("eieiaroijang")?.value;
-      if (!userKey) return new Response("Unauthorized", { status: 401 });
+      const token = req.cookies.get("eieiaroijang")?.value;
+      let userKey: string;
+
+      if (!token) return new Response("Unauthorized", { status: 401 });
+      try{
+        const { payload } = await jwtVerify(token, secret) as { payload: JwtPayload };
+        userKey = payload.username + payload.ip;
+      } catch {
+        return new Response("Unauthorized", { status: 401 });
+      }
 
       const { conversationId, messageIndex } = await req.json();
   
