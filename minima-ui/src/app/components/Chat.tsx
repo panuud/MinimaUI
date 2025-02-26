@@ -28,8 +28,10 @@ export default function Chat() {
     const [showHistory, setShowHistory] = useState(false);
     const [chatHistory, setChatHistory] = useState<Conversation[]>([]);
     const [conversationId, setConversationId] = useState<string>(uuidv4())
+    const imageInputRef = useRef<HTMLInputElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [imageFiles, setImageFiles] = useState<ImagesFile[]>([]);
+    const [textFiles, setTextFiles] = useState<File[]>([]);
     const [showLogin, setShowLogin] = useState(false);
     const [password, setPassword] = useState("");
     const [username, setUsername] = useState("");
@@ -58,6 +60,13 @@ export default function Chat() {
 
         // Trigger images selection
         if (input.trim() === "/image") {
+            imageInputRef.current?.click();
+            setInput("");
+            return;
+        }
+
+        // Trigger file selection
+        if (input.trim() === "/file") {
             fileInputRef.current?.click();
             setInput("");
             return;
@@ -123,10 +132,13 @@ export default function Chat() {
         setInput("");
 
         try {
-            const response = await fetch("/api/chat", {
+            const chatType: string = textFiles.length > 0? "/api/rag": "/api/chat";
+            const body: object = textFiles.length > 0? { messages: newMessages, fileNames: textFiles.map((file) => file.name) }: { messages: newMessages };
+
+            const response = await fetch(chatType, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messages: newMessages }),
+                body: JSON.stringify(body),
             });
 
             if (!response.body) throw new Error("No response body");
@@ -248,7 +260,7 @@ export default function Chat() {
         }
     };
 
-    // Handles multiple file selection
+    // Handles images selection
     const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (!files) return;
@@ -262,6 +274,42 @@ export default function Chat() {
         );
     
         setImageFiles((prevFiles) => [...prevFiles, ...processedFiles]);
+        event.target.value = "";
+    };
+
+    // Create a vector store from text files
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files) return;
+
+        setLoading(true);
+
+        const fileArray = Array.from(files);
+        setTextFiles((prevFiles) => [...prevFiles, ...fileArray]);
+    
+        const formData = new FormData();
+        fileArray.forEach((file) => {
+            formData.append("files", file);
+        });
+
+        try {
+            const response = await fetch("/api/create-vectorstore", {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!response.ok) {
+                const { error } = await response.json();
+                setMessages((prev) => [...prev, { role: "system", content: error }]);
+                setTextFiles([]);
+            }
+          } catch {
+            setMessages((prev) => [...prev, { role: "system", content: "Failed to upload file" }]);
+            setTextFiles([]);
+          }
+          
+        setLoading(false);
+        event.target.value = "";
     };
 
     // Function to convert file to base64
@@ -276,6 +324,10 @@ export default function Chat() {
 
     const handleRemoveImage = (index: number) => {
         setImageFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
+    };
+
+    const handleRemoveTextFile = (index: number) => {
+        setTextFiles((prevFiles) => prevFiles.filter((_, i) => i !== index));
     };
 
     const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -338,7 +390,7 @@ export default function Chat() {
           document.removeEventListener("keydown", handleKeyDown);
         };
       }, [showHistory, setShowHistory]);
-      
+          
     return (
         <div className="fixed inset-0 bg-zinc-950 flex flex-col max-w-2xl mx-auto">
             {/* login tab */}
@@ -364,20 +416,25 @@ export default function Chat() {
             {/* Chat messages area */}
             <div className="flex-1 overflow-y-auto space-y-2 max-w-full">
                 {messages.map((msg, idx) => (
-                    <div key={idx} className="flex group relative">
-                        {typeof msg.content === "string" && msg.content.startsWith("http") ?
-                            (<Image src={msg.content} width={500} height={500} alt="generated" className="max-w-full rounded-lg" />) :
-                            (<pre className="text-left text-gray-200 break-words whitespace-pre-wrap max-w-full">{'>>> ' + msg.content}</pre>)
-                        }
-                        <button
-                            className="hidden group-hover:inline text-red-400 text-xs absolute bottom-0 right-0"
-                            onClick={() => deleteMessage(idx)}
-                            >
-                            ✖
-                        </button>
+                    <div key={idx} >
+                        <div className="flex group relative">
+                            {typeof msg.content === "string" && msg.content.startsWith("http") ?
+                                (<Image src={msg.content} width={500} height={500} alt="generated" className="max-w-full rounded-lg" />) :
+                                (<pre className="text-left text-gray-200 break-words whitespace-pre-wrap max-w-full">{'>>> ' + msg.content}</pre>)
+                            }
+                            <button
+                                className="hidden group-hover:inline text-red-400 text-xs absolute bottom-0 right-0"
+                                onClick={() => deleteMessage(idx)}
+                                >
+                                ✖
+                            </button>
+                        </div>
+                        {idx < messages.length - 1 && (
+                            <hr className="w-1/2 border-dashed place-self-center my-2 border-gray-200"/>
+                        )}
                     </div>
                 ))}
-                {loading && <p className="text-gray-400">Typing...</p>}
+                {loading && <p className="text-gray-400">Loading...</p>}
             </div>
 
             {/* Input area */}
@@ -396,6 +453,21 @@ export default function Chat() {
                         ))}
                     </div>
                 )}
+                {/* Display textFiles */}
+                {textFiles.length > 0 && (
+                    <div className="mb-1 text-white text-sm self-start space-y-1">
+                        {textFiles.map((file, index) => (
+                            <span 
+                                key={index} 
+                                className="cursor-pointer mx-2"
+                                onClick={() => handleRemoveTextFile(index)}
+                            >
+                                {file.name}
+                            </span>
+                        ))}
+                    </div>
+                )}
+
                 <textarea
                     ref={textareaRef}
                     className="w-4/5 px-4 py-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none resize-none"
@@ -408,8 +480,16 @@ export default function Chat() {
                     type="file"
                     accept="image/*"
                     multiple
-                    ref={fileInputRef}
+                    ref={imageInputRef}
                     onChange={handleImageChange}
+                    className="hidden"
+                />
+                <input
+                    type="file"
+                    accept="application/pdf"
+                    multiple
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
                     className="hidden"
                 />
             </div>
