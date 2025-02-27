@@ -1,9 +1,44 @@
 ﻿import { NextRequest } from "next/server";
+import path from "path";
+import { FaissStore } from "@langchain/community/vectorstores/faiss";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import fs from "fs";
 import { ChatOpenAI } from "@langchain/openai";
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const { messages, fileNames } = await req.json();
+
+    //trigger RAG
+    if (fileNames) {
+      const vectorstoreDir = path.join(process.cwd(), "data/vectorstore");
+      const embeddings = new OpenAIEmbeddings({ model: "text-embedding-3-small" });
+      const vectorStore = new FaissStore(embeddings, {});
+      
+      //prepare vector store
+      for (const file of fileNames) {
+          const fileName = path.parse(file).name;
+          const vectorStorePath = path.join(vectorstoreDir, fileName);
+  
+          if (!fs.existsSync(vectorStorePath)) {
+              return new Response("Vector path does not exist.", { status: 404 });
+          }
+  
+          const loadVectorStore = await FaissStore.load(vectorStorePath, embeddings);
+          await vectorStore.mergeFrom(loadVectorStore);
+      }
+  
+      //get last message for rag
+      const lastMessage: string = messages[messages.length - 1];
+      const lastMessageContent: string = messages[messages.length - 1].content;
+      const retriever = vectorStore.asRetriever({ k: 5 });
+      const results = await retriever.invoke(lastMessageContent);
+
+      messages.pop();
+      messages.push( { role: "system", content: "Here are some related documents" });
+      messages.push( { role: "system", content: JSON.stringify(results) });
+      messages.push(lastMessage);
+    }
 
     const model = new ChatOpenAI({
       model: "chatgpt-4o-latest",

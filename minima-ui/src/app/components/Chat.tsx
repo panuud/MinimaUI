@@ -132,10 +132,9 @@ export default function Chat() {
         setInput("");
 
         try {
-            const chatType: string = textFiles.length > 0? "/api/rag": "/api/chat";
             const body: object = textFiles.length > 0? { messages: newMessages, fileNames: textFiles.map((file) => file.name) }: { messages: newMessages };
 
-            const response = await fetch(chatType, {
+            const response = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
