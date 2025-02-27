@@ -95,10 +95,19 @@ export default function Chat() {
                 if (!response.ok) throw new Error("Failed to generate image");
 
                 const { url } = await response.json();
-                setMessages([...messages, { role: "system", content: url }]);
+                setMessages((prev) => {
+                    const messages: Message[] = [...prev, { role: "system", content: url }]
+                    saveHistory(messages);
+                    return messages;
+                });
             } catch {
-                setMessages([...messages, { role: "system", content: "Failed to generate image" }]);
+                setMessages((prev) => {
+                    const messages: Message[] = [...prev, { role: "system", content: "Failed to generate image" }]
+                    saveHistory(messages);
+                    return messages;
+                });
             }
+
             setLoading(false);
             return;
         }
