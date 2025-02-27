@@ -5,10 +5,33 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import fs from "fs";
 import { ChatOpenAI } from "@langchain/openai";
 import unidecode from 'unidecode';
+import { jwtVerify } from "jose";
+
+
+const JWT_SECRET = process.env.JWT_SECRET!;
+const secret = new TextEncoder().encode(JWT_SECRET);
+
+interface JwtPayload {
+  auth: boolean;
+  ip: string;
+  username: string;
+}
 
 export async function POST(req: NextRequest) {
   try {
     const { messages, fileNames } = await req.json();
+
+    // get userkey
+    const token = req.cookies.get("eieiaroijang")?.value;
+    let userKey: string;
+
+    if (!token) return new Response("Unauthorized", { status: 401 });
+    try{
+      const { payload } = await jwtVerify(token, secret) as { payload: JwtPayload };
+      userKey = unidecode(payload.username + payload.ip).replace(/[^a-zA-Z0-9 ]/g, '');
+    } catch {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
     //trigger RAG
     if (fileNames) {
@@ -18,16 +41,16 @@ export async function POST(req: NextRequest) {
       
       //prepare vector store
       for (const file of fileNames) {
-          const fileName = path.parse(file).name;
-          const safeFileName = unidecode(fileName);
-          const vectorStorePath = path.join(vectorstoreDir, safeFileName);
-  
-          if (!fs.existsSync(vectorStorePath)) {
-              return new Response("Vector path does not exist.", { status: 404 });
-          }
-  
-          const loadVectorStore = await FaissStore.load(vectorStorePath, embeddings);
-          await vectorStore.mergeFrom(loadVectorStore);
+        const fileName = path.parse(file).name;
+        const safeFileName = unidecode(fileName);
+        const vectorStorePath = path.join(vectorstoreDir, userKey, safeFileName);
+
+        if (!fs.existsSync(vectorStorePath)) {
+          return new Response("Vector path does not exist.", { status: 404 });
+        }
+
+        const loadVectorStore = await FaissStore.load(vectorStorePath, embeddings);
+        await vectorStore.mergeFrom(loadVectorStore);
       }
   
       //get last message for rag

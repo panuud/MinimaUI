@@ -7,16 +7,18 @@ import fs from "fs";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { writeFile, unlink } from "fs/promises";
 import unidecode from 'unidecode';
+import { jwtVerify } from "jose";
 
 // directory
 const vectorstoreDir = path.join(process.cwd(), "data/vectorstore");
 const uploadDir = path.join(process.cwd(), "data/uploads");
 
 // Ensure the vector store directory exists before saving
-const ensureDirectory = () => {
-    if (!fs.existsSync(vectorstoreDir)) {
-        fs.mkdirSync(vectorstoreDir, { recursive: true });
-        console.log("Created vectorstore directory:", vectorstoreDir);
+const ensureDirectory = (userKey: string) => {
+  const vectorStoreDirWithUserKey = path.join(vectorstoreDir, userKey);
+    if (!fs.existsSync(vectorStoreDirWithUserKey)) {
+        fs.mkdirSync(vectorStoreDirWithUserKey, { recursive: true });
+        console.log("Created vectorstore directory:", vectorStoreDirWithUserKey);
     }
     if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
@@ -24,10 +26,31 @@ const ensureDirectory = () => {
     }
 };
 
+const JWT_SECRET = process.env.JWT_SECRET!;
+const secret = new TextEncoder().encode(JWT_SECRET);
+
+interface JwtPayload {
+  auth: boolean;
+  ip: string;
+  username: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    ensureDirectory();
-    
+    // get userkey
+    const token = req.cookies.get("eieiaroijang")?.value;
+    let userKey: string;
+
+    if (!token) return new Response("Unauthorized", { status: 401 });
+    try{
+      const { payload } = await jwtVerify(token, secret) as { payload: JwtPayload };
+      userKey = unidecode(payload.username + payload.ip).replace(/[^a-zA-Z0-9 ]/g, '');
+    } catch {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    ensureDirectory(userKey);
+
     const data = await req.formData();
     const files: File[] = Array.from(data.getAll("files")) as File[];
 
@@ -65,7 +88,7 @@ export async function POST(req: NextRequest) {
       
       // safe ANCII file path
       const safeFileName = unidecode(path.parse(file.name).name);
-      await vectorStore.save(path.join(vectorstoreDir, safeFileName));
+      await vectorStore.save(path.join(vectorstoreDir, userKey, safeFileName));
     }
 
     return NextResponse.json({ message: "All texts processed successfully!" });
