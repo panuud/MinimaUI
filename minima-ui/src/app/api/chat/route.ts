@@ -4,6 +4,7 @@ import { FaissStore } from "@langchain/community/vectorstores/faiss";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import fs from "fs";
 import { ChatOpenAI } from "@langchain/openai";
+import unidecode from 'unidecode';
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +19,8 @@ export async function POST(req: NextRequest) {
       //prepare vector store
       for (const file of fileNames) {
           const fileName = path.parse(file).name;
-          const vectorStorePath = path.join(vectorstoreDir, fileName);
+          const safeFileName = unidecode(fileName);
+          const vectorStorePath = path.join(vectorstoreDir, safeFileName);
   
           if (!fs.existsSync(vectorStorePath)) {
               return new Response("Vector path does not exist.", { status: 404 });
@@ -71,6 +73,7 @@ export async function POST(req: NextRequest) {
 
     return new Response(readableStream, { headers: { "Content-Type": "text/plain" } });
   } catch (err) {
+    console.error("Error processing chat:", err);
     return new Response("Something went wrong.", { status: 500 });
   }
 }

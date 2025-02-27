@@ -6,6 +6,7 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import fs from "fs";
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { writeFile, unlink } from "fs/promises";
+import unidecode from 'unidecode';
 
 // directory
 const vectorstoreDir = path.join(process.cwd(), "data/vectorstore");
@@ -36,32 +37,35 @@ export async function POST(req: NextRequest) {
 
     // Initialize LangChain FAISS vector store
     const embeddings = new OpenAIEmbeddings({ model: "text-embedding-3-small" });
-    const vectorStore = new FaissStore(embeddings, {});
 
     for (const file of files) {
-        // Convert file to buffer
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+      const vectorStore = new FaissStore(embeddings, {});
 
-        // Save PDF temporarily
-        const filePath = path.join(uploadDir, file.name);;
-        await writeFile(filePath, buffer);
+      // Convert file to buffer
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
 
-        // Process PDF
-        const loader = new PDFLoader(filePath);
-        const docs = await loader.load();
-        const splitter = new RecursiveCharacterTextSplitter({
-            chunkSize: 2000,
-            chunkOverlap: 200,
-        });
-        const splits = await splitter.splitDocuments(docs);
+      // Save PDF temporarily
+      const filePath = path.join(uploadDir, file.name);;
+      await writeFile(filePath, buffer);
 
-        // Add splits to FAISS vector store
-        await vectorStore.addDocuments(splits);
-        // Delete temporary file after processing
-        await unlink(filePath);
-        
-        await vectorStore.save(path.join(vectorstoreDir, path.parse(file.name).name));
+      // Process PDF
+      const loader = new PDFLoader(filePath);
+      const docs = await loader.load();
+      const splitter = new RecursiveCharacterTextSplitter({
+          chunkSize: 2000,
+          chunkOverlap: 200,
+      });
+      const splits = await splitter.splitDocuments(docs);
+
+      // Add splits to FAISS vector store
+      await vectorStore.addDocuments(splits);
+      // Delete temporary file after processing
+      await unlink(filePath);
+      
+      // safe ANCII file path
+      const safeFileName = unidecode(path.parse(file.name).name);
+      await vectorStore.save(path.join(vectorstoreDir, safeFileName));
     }
 
     return NextResponse.json({ message: "All texts processed successfully!" });
