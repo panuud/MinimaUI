@@ -1,6 +1,5 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import path from "path";
-import { FaissStore } from "@langchain/community/vectorstores/faiss";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 import fs from "fs";
@@ -8,6 +7,7 @@ import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
 import { writeFile, unlink } from "fs/promises";
 import unidecode from 'unidecode';
 import { jwtVerify } from "jose";
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
 
 // directory
 const vectorstoreDir = path.join(process.cwd(), "data/vectorstore");
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const embeddings = new OpenAIEmbeddings({ model: "text-embedding-3-small" });
 
     for (const file of files) {
-      const vectorStore = new FaissStore(embeddings, {});
+      const vectorStore = new MemoryVectorStore(embeddings, {});
 
       // Convert file to buffer
       const bytes = await file.arrayBuffer();
@@ -88,7 +88,10 @@ export async function POST(req: NextRequest) {
       
       // safe ANCII file path
       const safeFileName = unidecode(path.parse(file.name).name);
-      await vectorStore.save(path.join(vectorstoreDir, userKey, safeFileName));
+      const jsonFilePath = path.join(vectorstoreDir, userKey, `${safeFileName}.json`);
+
+      const jsonToStore = vectorStore.memoryVectors;
+      fs.writeFileSync(jsonFilePath, JSON.stringify(jsonToStore, null, 2), 'utf-8');
     }
 
     return NextResponse.json({ message: "All texts processed successfully!" });

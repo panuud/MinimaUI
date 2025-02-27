@@ -1,12 +1,11 @@
 ﻿import { NextRequest } from "next/server";
 import path from "path";
-import { FaissStore } from "@langchain/community/vectorstores/faiss";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import fs from "fs";
 import { ChatOpenAI } from "@langchain/openai";
 import unidecode from 'unidecode';
 import { jwtVerify } from "jose";
-
+import { MemoryVectorStore } from "langchain/vectorstores/memory";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const secret = new TextEncoder().encode(JWT_SECRET);
@@ -37,20 +36,27 @@ export async function POST(req: NextRequest) {
     if (fileNames) {
       const vectorstoreDir = path.join(process.cwd(), "data/vectorstore");
       const embeddings = new OpenAIEmbeddings({ model: "text-embedding-3-small" });
-      const vectorStore = new FaissStore(embeddings, {});
+      const vectorStore = new MemoryVectorStore(embeddings, {});
       
       //prepare vector store
       for (const file of fileNames) {
         const fileName = path.parse(file).name;
         const safeFileName = unidecode(fileName);
-        const vectorStorePath = path.join(vectorstoreDir, userKey, safeFileName);
+        const vectorStorePath = path.join(vectorstoreDir, userKey, `${safeFileName}.json`);
 
         if (!fs.existsSync(vectorStorePath)) {
           return new Response("Vector path does not exist.", { status: 404 });
         }
 
-        const loadVectorStore = await FaissStore.load(vectorStorePath, embeddings);
-        await vectorStore.mergeFrom(loadVectorStore);
+        // Load JSON index from file
+        const vectorStoreData = JSON.parse(fs.readFileSync(vectorStorePath, 'utf-8'));
+
+        // Create a new MemoryVectorStore and assign the loaded data
+        const loadedVectorStore = new MemoryVectorStore(embeddings);
+        loadedVectorStore.memoryVectors = vectorStoreData;
+        
+        // Merge the loaded vectors into the global vector store
+        vectorStore.memoryVectors.push(...loadedVectorStore.memoryVectors);
       }
   
       //get last message for rag
