@@ -12,9 +12,11 @@
     "@langchain/community": "^0.3.32",
     "@langchain/core": "^0.3.40",
     "@langchain/openai": "^0.4.4",
+    "duck-duck-scrape": "^2.2.7",
     "jose": "^5.10.0",
     "next": "15.1.7",
     "pdf-parse": "^1.1.1",
+    "puppeteer": "^24.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "unidecode": "^1.1.0"

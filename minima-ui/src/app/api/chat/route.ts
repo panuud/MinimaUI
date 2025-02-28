@@ -6,6 +6,9 @@ import { ChatOpenAI } from "@langchain/openai";
 import unidecode from 'unidecode';
 import { jwtVerify } from "jose";
 import { MemoryVectorStore } from "langchain/vectorstores/memory";
+import { PuppeteerWebBaseLoader } from "@langchain/community/document_loaders/web/puppeteer";
+import { search, SafeSearchType } from 'duck-duck-scrape';
+import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const secret = new TextEncoder().encode(JWT_SECRET);
@@ -16,9 +19,50 @@ interface JwtPayload {
   username: string;
 }
 
+async function getWebSearchContents(searchQuery: string, maxResults: number) {
+  const embeddings = new OpenAIEmbeddings({ model: "text-embedding-3-small" });
+  const vectorStore = new MemoryVectorStore(embeddings, {});
+
+  const urls = (await search(searchQuery)).results.map(result => result.url);
+  const webSearchresults = [];
+  maxResults = Math.min(maxResults, urls.length);
+  for (let i = 0; i < maxResults; i++) {
+      const loader = new PuppeteerWebBaseLoader(urls[i], {
+          launchOptions: { headless: true },
+          gotoOptions: { waitUntil: "domcontentloaded" }, // Load when DOM content is loaded
+          evaluate: async (page) => {
+              return page.evaluate(() => {
+              // Extract text only from the <body> tag, removing scripts and styles
+              return document.body.innerText.trim();
+              });
+          },
+      });
+  
+      const documents = await loader.load();
+      webSearchresults.push(documents.map(doc => ({
+          metadata: doc.metadata,
+          pageContent: doc.pageContent
+      })));
+  }
+
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 100,
+  });
+  for (const result of webSearchresults) {
+    const splits = await splitter.splitDocuments(result);
+    await vectorStore.addDocuments(splits);
+  }
+
+  const retriever = vectorStore.asRetriever({ k: 7 });
+  const results = await retriever.invoke(searchQuery);
+
+  return results;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages, fileNames } = await req.json();
+    const { messages, fileNames, webSearch } = await req.json();
 
     // get userkey
     const token = req.cookies.get("eieiaroijang")?.value;
@@ -30,6 +74,28 @@ export async function POST(req: NextRequest) {
       userKey = unidecode(payload.username + payload.ip).replace(/[^a-zA-Z0-9 ]/g, '');
     } catch {
       return new Response("Unauthorized", { status: 401 });
+    }
+
+    //trigger web search
+    if (webSearch) {
+      //create search query
+      const model = new ChatOpenAI({
+        model: "gpt-4o-mini",
+        streaming: true,
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+      const queryResult = await model.invoke([...messages, { role: "user", content: "Generate a search query based on the previous chat conversation. Respond with only the query and nothing else. Do not include any explanations, introductions, or additional text—only the query itself." }]);
+      let searchQuery = queryResult.content as string;
+      searchQuery = searchQuery.replace(/[^a-zA-Z0-9 ]/g, '');
+
+      //get web search contents
+      const webSearchContents = await getWebSearchContents(searchQuery, 10);
+
+      const lastMessage: string = messages[messages.length - 1];
+      messages.pop();
+      messages.push( { role: "system", content: "Here are the contents from a web search." });
+      messages.push( { role: "system", content: JSON.stringify(webSearchContents) });
+      messages.push(lastMessage);
     }
 
     //trigger RAG

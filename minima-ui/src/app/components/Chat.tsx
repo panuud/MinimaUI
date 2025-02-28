@@ -35,6 +35,7 @@ export default function Chat() {
     const [showLogin, setShowLogin] = useState(false);
     const [password, setPassword] = useState("");
     const [username, setUsername] = useState("");
+    const [webSearch, setWebSearch] = useState(false);
 
     const sendMessage = async () => {
         if (!input.trim()) return;
@@ -68,6 +69,13 @@ export default function Chat() {
         // Trigger file selection
         if (input.trim() === "/file") {
             fileInputRef.current?.click();
+            setInput("");
+            return;
+        }
+
+        // Set web search mode
+        if (input.trim() === "/websearch") {
+            setWebSearch(!webSearch);
             setInput("");
             return;
         }
@@ -141,7 +149,8 @@ export default function Chat() {
         setInput("");
 
         try {
-            const body: object = textFiles.length > 0? { messages: newMessages, fileNames: textFiles.map((file) => file.name) }: { messages: newMessages };
+            const body: object = textFiles.length > 0? { messages: newMessages, fileNames: textFiles.map((file) => file.name), webSearch: webSearch }:
+             { messages: newMessages, webSearch: webSearch };
 
             const response = await fetch("/api/chat", {
                 method: "POST",
@@ -422,7 +431,7 @@ export default function Chat() {
             )}
 
             {/* Chat messages area */}
-            <div className="flex-1 overflow-y-auto space-y-2 max-w-full">
+            <div className="flex-1 overflow-y-auto max-w-full">
                 {messages.map((msg, idx) => (
                     <div key={idx} >
                         <div className="flex group relative">
@@ -475,15 +484,20 @@ export default function Chat() {
                         ))}
                     </div>
                 )}
-
-                <textarea
-                    ref={textareaRef}
-                    className="w-4/5 px-4 py-2 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none resize-none"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown} // Handle enter key
-                    rows={1} // Start with one row
-                />
+                <div className="relative w-full flex justify-center">
+                    <textarea
+                        ref={textareaRef}
+                        className="w-4/5 px-4 py-1 bg-zinc-950 text-white rounded-lg border border-gray-600 focus:outline-none resize-none"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown} // Handle enter key
+                        rows={1} // Start with one row
+                    />
+                    {/* Display webSearch mode */}
+                    {webSearch && (
+                        <span className="absolute right-3 top-1 cursor-pointer" onClick={() => setWebSearch(false)}>🌐</span>
+                    )}
+                </div>
                 <input
                     type="file"
                     accept="image/*"
